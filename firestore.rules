@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /jugadores/{docId} {
+      allow read: if true;
+
+      allow create: if
+        request.resource.data.keys().hasAll(
+          ['nombreJugador','codigoID','equipo','frecuencia',
+           'disponibilidadRemoto','comuna','pokemonFavorito','fechaRegistro'])
+        && request.resource.data.nombreJugador is string
+        && request.resource.data.nombreJugador.size() > 0
+        && request.resource.data.nombreJugador.size() < 60
+        && request.resource.data.codigoID is string
+        && request.resource.data.codigoID.size() > 0
+        && request.resource.data.codigoID.size() < 30
+        && request.resource.data.equipo in ['valor','sabiduria','instinto']
+        && request.resource.data.frecuencia in ['activo','eventual','ocasional']
+        && request.resource.data.disponibilidadRemoto in
+           ['cuenta_conmigo','tal_vez','no_juego_remotos'];
+
+      // Nadie puede editar ni borrar registros desde la web pública.
+      // Los administradores del club lo hacen desde la consola de Firebase.
+      allow update, delete: if false;
+
+      // La foto del QR vive en un sub-documento aparte (no en Storage,
+      // que ahora exige el plan de pago Blaze) para que listar/buscar
+      // el directorio no tenga que descargar todas las imágenes.
+      match /qr/{qrDoc} {
+        allow read: if true;
+
+        allow create: if
+          request.resource.data.keys().hasAll(['data', 'fechaRegistro'])
+          && request.resource.data.data is string
+          // ~700 KB de texto base64 (harto margen bajo el límite de
+          // 1 MiB por documento de Firestore).
+          && request.resource.data.data.size() < 750000;
+
+        allow update, delete: if false;
+      }
+    }
+  }
+}
